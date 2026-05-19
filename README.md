@@ -1,2 +1,2 @@
 # TwoPredators
-fun in the sun
+I hope you enjoy!
