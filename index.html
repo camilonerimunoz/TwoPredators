@@ -1,0 +1,324 @@
+Here it is — select all and copy:Here you go — copy everything below:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Two Predators — John Hollander</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0f1a; color: #e8e8e8; min-height: 100vh; display: flex; align-items: flex-start; justify-content: flex-start; }
+    #wrap { font-family: Georgia, serif; width: 100%; padding: 48px 0 48px 8%; }
+    #poem-view { display: block; }
+    #sim-view { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0f1a; z-index: 10; }
+    canvas { display: block; width: 100%; height: 100%; cursor: none; }
+    .back-btn {
+      position: fixed; bottom: 24px; right: 24px; z-index: 20;
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25);
+      color: #fff; padding: 8px 18px; border-radius: 20px; cursor: pointer;
+      font-size: 13px; font-family: Georgia, serif; backdrop-filter: blur(4px);
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.2); }
+    hr { border: none; border-top: 1px solid #444; margin: 0 0 32px; }
+    em { font-style: italic; }
+    #poem-text { font-size: 10px; line-height: 18px; color: #e8e8e8; font-family: Helvetica, Arial, sans-serif; }
+  </style>
+</head>
+<body>
+
+<div id="wrap">
+  <div id="poem-view">
+    <p style="font-style:italic;letter-spacing:0.08em;font-size:14px;margin:0 0 12px;font-family:Georgia,serif;">JOHN HOLLANDER</p>
+    <hr>
+    <h2 style="font-size:19px;letter-spacing:0.12em;font-weight:normal;margin:0 0 16px;">
+      TWO <a id="trigger" href="#" style="color:#1a73e8;text-decoration:underline;font-family:Georgia,serif;font-size:19px;letter-spacing:0.12em;font-weight:normal;">PREDATORS</a>
+    </h2>
+    <p style="font-size:15px;margin:0 0 22px;">I</p>
+    <div id="poem-text">
+He will acknowledge no fault in himself.<br>
+Unlike his prey—or those others who are<br>
+At most part of the scenery through which<br>
+He pushes his mortal pursuit—he can<br>
+Not imagine what in him could demand<br>
+Sad scrutiny. And as for those he hunts,<br>
+Aswim, a-scampering, a-flap,<br>
+Driven on by the terror, chilling, of<br>
+Sudden recognition but all too late—<br>
+A kind of widespread fault (miscalled by<br>
+Those who talk like that a virtue) cruelly<br>
+Cripples those he feeds on, the fault of being<br>
+Able to perceive that some habit or<br>
+Disposition of your own frailty which<br>
+Needlessly harms or discomforts others<br>
+<em>Is</em> a fault—to be acknowledged as such,<br>
+A fault perhaps even to be worked at.<br>
+This very awareness in itself he<br>
+Knows to be the sick blossom of weak roots<br>
+Sent up as if in defense; no more than<br>
+A sign that one is destined to be his<br>
+Lunch.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;As for his own very awareness<br>
+That this common phenomenon exists<br>
+In others—this self-deception, almost<br>
+Sad? He might have to allow, after all,<br>
+That this, perhaps, is his only weakness.
+    </div>
+  </div>
+  <div id="sim-view">
+    <canvas id="c"></canvas>
+    <button class="back-btn" id="back" style="background:none;border:none;color:#1a73e8;text-decoration:underline;font-size:13px;font-family:Georgia,serif;cursor:pointer;padding:0;">I wish I hadn't done that.</button>
+  </div>
+</div>
+
+<script>
+const trigger = document.getElementById('trigger');
+const poemView = document.getElementById('poem-view');
+const simView = document.getElementById('sim-view');
+const canvas = document.getElementById('c');
+const backBtn = document.getElementById('back');
+const ctx = canvas.getContext('2d');
+
+const SEP_W=1.2, ALI_W=1.6, COH_W=1.6;
+const MAX_SPEED=6.1, PRED_SPEED=1.8, FLEE_R=85, FLEE_R2=FLEE_R*FLEE_R;
+const MARGIN=30, PERC=65, PERC2=PERC*PERC, SEP_D2=20*20;
+const MAX_FORCE=0.12, TURN=0.3;
+const COLOR_R=FLEE_R*1.8, BASE_SIZE=10;
+const CELL=PERC;
+
+const LINES = [
+  "He will acknowledge no fault in himself.",
+  "Unlike his prey—or those others who are",
+  "At most part of the scenery through which",
+  "He pushes his mortal pursuit—he can",
+  "Not imagine what in him could demand",
+  "Sad scrutiny. And as for those he hunts,",
+  "Aswim, a-scampering, a-flap,",
+  "Driven on by the terror, chilling, of",
+  "Sudden recognition but all too late—",
+  "A kind of widespread fault (miscalled by",
+  "Those who talk like that a virtue) cruelly",
+  "Cripples those he feeds on, the fault of being",
+  "Able to perceive that some habit or",
+  "Disposition of your own frailty which",
+  "Needlessly harms or discomforts others",
+  "Is a fault—to be acknowledged as such,",
+  "A fault perhaps even to be worked at.",
+  "This very awareness in itself he",
+  "Knows to be the sick blossom of weak roots",
+  "Sent up as if in defense; no more than",
+  "A sign that one is destined to be his",
+  "Lunch.",
+  "          As for his own very awareness",
+  "That this common phenomenon exists",
+  "In others—this self-deception, almost",
+  "Sad? He might have to allow, after all,",
+  "That this, perhaps, is his only weakness."
+];
+
+let N = 0;
+let bx, by, bvx, bvy, letters = [];
+let pred1 = { x:0, y:0, vx:0, vy:0 };
+let mouse  = { x:-9999, y:-9999 };
+let running = false, animId = null, frame = 0;
+let grid = new Map();
+
+function buildGrid() {
+  grid.clear();
+  for (let i=0; i<N; i++) {
+    const key = (Math.floor(bx[i]/CELL) * 10000 + Math.floor(by[i]/CELL)) | 0;
+    let cell = grid.get(key);
+    if (!cell) { cell = []; grid.set(key, cell); }
+    cell.push(i);
+  }
+}
+
+function getNeighbourIndices(i) {
+  const cx = Math.floor(bx[i]/CELL), cy = Math.floor(by[i]/CELL);
+  const out = [];
+  for (let dx=-1; dx<=1; dx++) for (let dy=-1; dy<=1; dy++) {
+    const cell = grid.get(((cx+dx)*10000+(cy+dy))|0);
+    if (cell) for (let k=0; k<cell.length; k++) out.push(cell[k]);
+  }
+  return out;
+}
+
+function getLetterPositions() {
+  const offCtx = document.createElement('canvas').getContext('2d');
+  offCtx.font = `${BASE_SIZE}px Helvetica,Arial,sans-serif`;
+  const lineHeight = 18;
+  const startX = window.innerWidth * 0.08;
+  const poemTextEl = document.getElementById('poem-text');
+  const poemTextTop = poemTextEl.getBoundingClientRect().top + window.scrollY;
+  const result = [];
+  for (let li=0; li<LINES.length; li++) {
+    const line = LINES[li];
+    const y = poemTextTop + li * lineHeight + lineHeight / 2;
+    let x = startX;
+    for (let ci=0; ci<line.length; ci++) {
+      const ch = line[ci];
+      const cw = offCtx.measureText(ch).width;
+      if (ch !== ' ') result.push({ x, y, letter: ch });
+      x += cw;
+    }
+  }
+  return result;
+}
+
+function update() {
+  const w=canvas.width, h=canvas.height;
+  buildGrid();
+  let cx=0, cy=0;
+  for (let i=0; i<N; i++) { cx+=bx[i]; cy+=by[i]; }
+  cx/=N; cy/=N;
+  const pdx=cx-pred1.x, pdy=cy-pred1.y, pd=Math.sqrt(pdx*pdx+pdy*pdy);
+  if (pd>0) { pred1.vx+=(pdx/pd)*.25; pred1.vy+=(pdy/pd)*.25; }
+  const pm2=pred1.vx*pred1.vx+pred1.vy*pred1.vy;
+  if(pm2>PRED_SPEED*PRED_SPEED){const s=PRED_SPEED/Math.sqrt(pm2);pred1.vx*=s;pred1.vy*=s;}
+  pred1.x+=pred1.vx; pred1.y+=pred1.vy;
+  pred1.x=Math.max(4,Math.min(w-4,pred1.x));
+  pred1.y=Math.max(4,Math.min(h-4,pred1.y));
+  const fx=new Float32Array(N), fy=new Float32Array(N);
+  for (let i=0; i<N; i++) {
+    const near=getNeighbourIndices(i);
+    let sx=0,sy=0,ax=0,ay=0,cbx=0,cby=0,sc=0,ac=0,cc=0;
+    for (let k=0; k<near.length; k++) {
+      const j=near[k]; if(j===i) continue;
+      const dx=bx[j]-bx[i], dy=by[j]-by[i], d2=dx*dx+dy*dy;
+      if (d2<PERC2) {
+        if(d2<SEP_D2&&d2>0){const d=Math.sqrt(d2);sx-=dx/d;sy-=dy/d;sc++;}
+        ax+=bvx[j];ay+=bvy[j];ac++;
+        cbx+=bx[j];cby+=by[j];cc++;
+      }
+    }
+    const steerAdd=(stx,sty,w)=>{
+      const m=Math.sqrt(stx*stx+sty*sty)||1;
+      let rx=stx/m*MAX_SPEED-bvx[i], ry=sty/m*MAX_SPEED-bvy[i];
+      const rm=Math.sqrt(rx*rx+ry*ry);
+      if(rm>MAX_FORCE){rx=rx/rm*MAX_FORCE;ry=ry/rm*MAX_FORCE;}
+      fx[i]+=rx*w; fy[i]+=ry*w;
+    };
+    if(sc>0) steerAdd(sx/sc,sy/sc,SEP_W*2.5);
+    if(ac>0) steerAdd(ax/ac,ay/ac,ALI_W);
+    if(cc>0) steerAdd(cbx/cc-bx[i],cby/cc-by[i],COH_W);
+    const f1x=bx[i]-pred1.x,f1y=by[i]-pred1.y,fd1=f1x*f1x+f1y*f1y;
+    if(fd1<FLEE_R2&&fd1>0){const d=Math.sqrt(fd1),s=(1-d/FLEE_R)*1.4;fx[i]+=(f1x/d)*s;fy[i]+=(f1y/d)*s;}
+    const f2x=bx[i]-mouse.x,f2y=by[i]-mouse.y,fd2=f2x*f2x+f2y*f2y;
+    if(fd2<FLEE_R2&&fd2>0){const d=Math.sqrt(fd2),s=(1-d/FLEE_R)*1.4;fx[i]+=(f2x/d)*s;fy[i]+=(f2y/d)*s;}
+    if(bx[i]<MARGIN)fx[i]+=TURN*(1-bx[i]/MARGIN);
+    if(bx[i]>w-MARGIN)fx[i]-=TURN*(1-(w-bx[i])/MARGIN);
+    if(by[i]<MARGIN)fy[i]+=TURN*(1-by[i]/MARGIN);
+    if(by[i]>h-MARGIN)fy[i]-=TURN*(1-(h-by[i])/MARGIN);
+  }
+  for (let i=0; i<N; i++) {
+    bvx[i]+=fx[i]; bvy[i]+=fy[i];
+    const m2=bvx[i]*bvx[i]+bvy[i]*bvy[i];
+    if(m2>MAX_SPEED*MAX_SPEED){const s=MAX_SPEED/Math.sqrt(m2);bvx[i]*=s;bvy[i]*=s;}
+    const spd=Math.sqrt(bvx[i]*bvx[i]+bvy[i]*bvy[i]);
+    if(spd>0&&spd<0.3){bvx[i]=bvx[i]/spd*.3;bvy[i]=bvy[i]/spd*.3;}
+    bx[i]+=bvx[i]; by[i]+=bvy[i];
+    bx[i]=Math.max(2,Math.min(w-2,bx[i]));
+    by[i]=Math.max(2,Math.min(h-2,by[i]));
+  }
+}
+
+function drawCursor(x,y) {
+  const s=20;
+  ctx.save();ctx.translate(x,y);
+  ctx.fillStyle='rgba(0,0,0,0.35)';
+  ctx.beginPath();ctx.moveTo(1,1);ctx.lineTo(1,s*.85+1);ctx.lineTo(s*.28+1,s*.6+1);
+  ctx.lineTo(s*.45+1,s+1);ctx.lineTo(s*.55+1,s*.95+1);ctx.lineTo(s*.38+1,s*.58+1);ctx.lineTo(s*.7+1,s*.58+1);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,s*.85);ctx.lineTo(s*.28,s*.6);
+  ctx.lineTo(s*.45,s);ctx.lineTo(s*.55,s*.95);ctx.lineTo(s*.38,s*.58);ctx.lineTo(s*.7,s*.58);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#000';ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,s*.85);ctx.lineTo(s*.28,s*.6);
+  ctx.lineTo(s*.45,s);ctx.lineTo(s*.55,s*.95);ctx.lineTo(s*.38,s*.58);ctx.lineTo(s*.7,s*.58);
+  ctx.closePath();ctx.stroke();
+  ctx.restore();
+}
+
+function draw() {
+  const w=canvas.width,h=canvas.height;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle='#0a0f1a';ctx.fillRect(0,0,w,h);
+  ctx.textAlign='left';ctx.textBaseline='middle';
+  const BUCKETS=8;
+  const buckets=Array.from({length:BUCKETS},()=>[]);
+  for (let i=0; i<N; i++) {
+    const d1x=bx[i]-pred1.x,d1y=by[i]-pred1.y;
+    const d2x=bx[i]-mouse.x,d2y=by[i]-mouse.y;
+    const f1=Math.max(0,1-Math.sqrt(d1x*d1x+d1y*d1y)/COLOR_R);
+    const f2=Math.max(0,1-Math.sqrt(d2x*d2x+d2y*d2y)/COLOR_R);
+    const fear=Math.pow(Math.min(1,f1+f2),0.4);
+    buckets[Math.min(BUCKETS-1,Math.floor(fear*BUCKETS))].push(i);
+  }
+  for (let b=0; b<BUCKETS; b++) {
+    const fear=(b+0.5)/BUCKETS;
+    const rg=Math.round((1-fear)*255);
+    const fs=BASE_SIZE*(1+fear*2);
+    ctx.font=`${fs.toFixed(1)}px Helvetica,Arial,sans-serif`;
+    ctx.fillStyle=`rgb(${rg},${rg},255)`;
+    for (let k=0; k<buckets[b].length; k++) {
+      const i=buckets[b][k];
+      ctx.fillText(letters[i],bx[i],by[i]);
+    }
+  }
+  drawCursor(pred1.x,pred1.y);
+  if(mouse.x>0) drawCursor(mouse.x,mouse.y);
+}
+
+function loop() {
+  if(!running) return;
+  frame++;
+  if(frame%2===0) update();
+  draw();
+  animId=requestAnimationFrame(loop);
+}
+
+function startSim() {
+  const positions = getLetterPositions();
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  poemView.style.display='none';
+  simView.style.display='block';
+  N=positions.length;
+  bx=new Float32Array(N); by=new Float32Array(N);
+  bvx=new Float32Array(N); bvy=new Float32Array(N);
+  letters=[];
+  for(let i=0;i<N;i++){
+    bx[i]=positions[i].x; by[i]=positions[i].y;
+    bvx[i]=0; bvy[i]=0;
+    letters.push(positions[i].letter);
+  }
+  pred1.x=5; pred1.y=5; pred1.vx=0; pred1.vy=0;
+  mouse.x=-9999; mouse.y=-9999;
+  frame=0; running=true;
+  loop();
+}
+
+function resetPoem() {
+  running=false;
+  if(animId) cancelAnimationFrame(animId);
+  simView.style.display='none';
+  poemView.style.display='block';
+}
+
+canvas.addEventListener('mousemove',e=>{
+  if(!running) return;
+  const r=canvas.getBoundingClientRect();
+  mouse.x=(e.clientX-r.left)*(canvas.width/r.width);
+  mouse.y=(e.clientY-r.top)*(canvas.height/r.height);
+});
+canvas.addEventListener('mouseleave',()=>{ mouse.x=-9999; mouse.y=-9999; });
+window.addEventListener('resize',()=>{ if(running){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }});
+trigger.addEventListener('click',e=>{ e.preventDefault(); if(!running) startSim(); });
+backBtn.addEventListener('click',resetPoem);
+</script>
+
+</body>
+</html>
+```
